@@ -2,9 +2,9 @@ import numpy as np
 import cvxpy as cp
 from itertools import combinations
 import heapq
-import random
 from scipy.special import comb as nCr
 import time
+import random
 
 
 def main():
@@ -347,9 +347,9 @@ def solve_tower(puzzle):
         total_count += np.count_nonzero(y_star == 1)
 
         # Push the current solution onto the heapquene
-        heapq.heappush(frontier, (prob.value+random.random()-total_count, x_star, [], y_star, []))
+        heapq.heappush(frontier, (random.random()-total_count,0, x_star, [], y_star, []))
     else:
-        heapq.heappush(frontier, (prob.value+random.random()-total_count, None, [], None, []))
+        heapq.heappush(frontier, (random.random()-total_count,0, None, [], None, []))
     iters = 0
     while(len(frontier) > 0):
         iters += 1
@@ -357,24 +357,24 @@ def solve_tower(puzzle):
         item = heapq.heappop(frontier)
 
         # Check if the lowest cost solution is integer valued and exists
-        if not(item[1] is None):
+        if not(item[2] is None):
 
-            x_done = np.all(np.logical_or(item[1] == 0, item[1] == 1))
-            y_done = np.all(np.logical_or(item[3] == 0, item[3] == 1))
+            x_done = np.all(np.logical_or(item[2] == 0, item[2] == 1))
+            y_done = np.all(np.logical_or(item[4] == 0, item[4] == 1))
             if(x_done and y_done):
                 # If it is, format an solution array, and then return it.
                 solution = []
                 for i in range(size):
                     solution_row = []
                     for j in range(size):
-                        solution_row.append(np.nonzero(item[1][i][j])[0][0] + 1)
+                        solution_row.append(np.nonzero(item[2][i][j])[0][0] + 1)
                     solution.append(solution_row)
-                constraints_int = item[2]
+                constraints_int = item[3]
                 return (solution, constraints_int,iters)
 
             # If no integer valued solution, find variable closest to .5
-            closestX = (np.abs(item[1]-.5))
-            closestY = (np.abs(item[3]-.5))
+            closestX = (np.abs(item[2]-.5))
+            closestY = (np.abs(item[4]-.5))
             x_constraint = False
             closest = closestY
             if(closestX.min() < closestY.min()):
@@ -387,9 +387,9 @@ def solve_tower(puzzle):
 
             # Get the current constraint set
             new_constraints = []
-            for con in item[2]:
+            for con in item[3]:
                 new_constraints.append(X[con[0]-1][con[1]-1][con[2]-1] == con[3])
-            for con in item[4]:
+            for con in item[5]:
                 new_constraints.append(Y[con[0]][con[1]] == con[2])
 
             # Solve the 0 and 1 constraint problems, and add them to the frontier
@@ -430,62 +430,39 @@ def solve_tower(puzzle):
                     total_count += np.count_nonzero(y_star == 1)
 
                     # Count the number of 1 constraints in x and y
-                    for con in item[2]:
+                    for con in item[3]:
                         total_count += con[3]
-                    for con in item[4]:
+                    for con in item[5]:
                         total_count += con[2]
                     total_count += c
 
-                    x_solution = []
+                    output = []
                     for i in range(size):
-                        solution_row = []
+                        row = []
                         for j in range(size):
-                            solution_row.append(np.nonzero(x_star[i][j])[0][0] + 1)
-                        x_solution.append(solution_row)
+                            if(np.all(np.logical_or(x_star[i][j] == 0, x_star[i][j] == 1))):
+                                row.append(np.nonzero(x_star[i][j])[0][0] + 1)
+                            else:
+                                row.append(0)
+                        output.append(row)
+                    x_solution = np.array(output)
 
-                    # Check which rows and columns are completed
-                    # And then check if they are valid
-                    valid_x = True
-                    for i in range(size):
-                        # Top
-                        if(np.all(np.logical_or(x_star[:,i] == 0, x_star[:,i] == 1))):
-                            get_visibility_number(x_solution[:,i])
-
-                        # Right
-                        if(np.all(np.logical_or(x_star[i, :][::-1] == 0, x_star[i, :][::-1] == 1))):
-                            get_visibility_number(x_solution[i, :][::-1])
-
-                        # Left
-                        if(np.all(np.logical_or(x_star[:, i][::-1] == 0, x_star[:, i][::-1] == 1))):
-                            get_visibility_number(x_solution[:, i][::-1])
-
-                        # Bottom
-                        if(np.all(np.logical_or(x_star[i, :] == 0, x_star[i, :] == 1))):
-                            get_visibility_number(x_solution[i, :])
-
-                    x_finished = np.all(np.logical_or(x_star == 0, x_star == 1))
+                    x_done = np.all(np.logical_or(x_star == 0, x_star == 1))
                     valid_x = False
-                    # Do not push the solution onto if the x values are not valid
-                    if(x_finished):
-                        x_solution = []
-                        for i in range(size):
-                            solution_row = []
-                            for j in range(size):
-                                solution_row.append(np.nonzero(x_star[i][j])[0][0] + 1)
-                            x_solution.append(solution_row)
-                        valid_x = validate_solution(np.array(x_solution),puzzle)
+                    if(x_done):
+                        valid_x = validate_solution(x_solution,puzzle)
 
-                    if not (x_finished and not valid_x):
+                    if not (x_done and not valid_x):
                         if(x_constraint):
-                            heapq.heappush(frontier,(prob.value+random.random()-total_count,x_star,item[2] + [(new_i+1, new_j+1, new_k+1, c)],y_star,item[4]))
+                            heapq.heappush(frontier,(random.random()-total_count,item[1]+1,x_star,item[3] + [(new_i+1, new_j+1, new_k+1, c)],y_star,item[5]))
                         else:
-                            heapq.heappush(frontier,(prob.value+random.random()-total_count,x_star,item[2],y_star,item[4] + [(new_i,new_j,c)]))
+                            heapq.heappush(frontier,(random.random()-total_count,item[1]+1,x_star,item[3],y_star,item[5] + [(new_i,new_j,c)]))
                 else:
                     # Push the current solution onto the heapquene
                     if(x_constraint):
-                        heapq.heappush(frontier,(prob.value+random.random()-total_count,None,item[2] + [(new_i+1, new_j+1, new_k+1, c)],None,item[4]))
+                        heapq.heappush(frontier,(random.random()-c,item[1]+1,None,item[3] + [(new_i+1, new_j+1, new_k+1, c)],None,item[5]))
                     else:
-                        heapq.heappush(frontier,(prob.value+random.random()-total_count,None,item[2],None,item[4] + [(new_i,new_j,c)]))
+                        heapq.heappush(frontier,(random.random()-c,item[1]+1,None,item[3],None,item[5] + [(new_i,new_j,c)]))
 
 
 if __name__ == '__main__':
