@@ -452,6 +452,7 @@ def solve_tower(puzzle):
                     if(x_done):
                         valid_x = validate_solution(x_solution,puzzle)
 
+
                     if not (x_done and not valid_x):
                         if(x_constraint):
                             heapq.heappush(frontier,(random.random()-total_count,item[1]+1,x_star,item[3] + [(new_i+1, new_j+1, new_k+1, c)],y_star,item[5]))
