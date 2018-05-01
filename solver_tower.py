@@ -5,11 +5,14 @@ import heapq
 from scipy.special import comb as nCr
 import time
 import random
+import puzzle_gen
 
 
 def main():
     #puzzle = [[4,1,4,2,3],[3,2,1,3,3],[2,2,1,2,3],[2,2,2,1,3]]
-    puzzle = [[2,2,2,1,3],[2,2,3,3,1],[2,2,3,3,1],[2,2,2,1,3]]
+    #puzzle = [[2,2,2,1,3],[2,2,3,3,1],[2,2,3,3,1],[2,2,2,1,3]]
+    #puzzle = [[1,2,4,3],[3,2,1,2],[2,2,1,2],[1,2,3,2]]
+    puzzle = get_random_puzzle(5)
     start_time = time.clock()
     output = solve_tower(puzzle)
     end_time = time.clock()
@@ -18,48 +21,24 @@ def main():
     print(output[1])
     print(output[2])
     print(end_time - start_time, "seconds")
-    print("Solved:",validate_solution(np.array(output[0]),puzzle))
+    print("Solved:",puzzle_gen.validate_solution(np.array(output[0]),puzzle))
 
-def get_visibility_number(towers):
-    # Towers is a numpy array, with towers from height 1 to n.
-    visible = 0
-    tallest = 0
-    for height in towers:
-        if height > tallest:
-            tallest = height
-            visible += 1
-    return visible
+def get_random_puzzle(size):
+    filename = "%d_square_board_data.npz" % size
+    loaded = np.load(filename)
 
-def validate_solution(grid, visibility):
-    # grid is the numpy array
-    # Visibility is a python tuple of Top, Right, Bottom, Left constraints
+    boards_array = loaded['boards_array']
+    # endpoints included
+    index = random.randint(0, len(boards_array) - 1)
+    print("INDEX:", index)
 
-    grid_size = len(grid)
-    top_visibility = visibility[0]
-    right_visibility = visibility[1]
-    bottom_visibility = visibility[2]
-    left_visibility = visibility[3]
+    board = boards_array[index]
+    board_size = int(len(board) ** 0.5)
+    board = board.reshape((board_size, board_size))
+    puzzle = puzzle_gen.get_visibility_numbers_from_grid(board)
 
-    for i in range(grid_size):
-        top_skyline = grid[:, i]
-        right_skyline = grid[i, :][::-1]
-        bottom_skyline = grid[:, i][::-1]
-        left_skyline = grid[i, :]
-
-        top_visible = get_visibility_number(top_skyline)
-        right_visible = get_visibility_number(right_skyline)
-        bottom_visible = get_visibility_number(bottom_skyline)
-        left_visible = get_visibility_number(left_skyline)
-
-        # Fails if any of the constraints don't work
-        if (top_visible != top_visibility[i] or
-            right_visible != right_visibility[i] or
-            bottom_visible != bottom_visibility[i] or
-            left_visible != left_visibility[i]
-            ):
-            return False
-
-    return True
+    print(board)
+    return puzzle
 
 def solve_tower(puzzle):
     # Puzzles are in the format:
@@ -171,10 +150,10 @@ def solve_tower(puzzle):
         Y.append(cp.Variable(len(comb)))
         # Create the between 0 and 1 constraint
         for k in range(len(comb)):
-            constraints.append(Y[5+i][k] <= 1)
-            constraints.append(Y[5+i][k] >= 0)
+            constraints.append(Y[size+i][k] <= 1)
+            constraints.append(Y[size+i][k] >= 0)
         # Create the only one on constraint
-        constraints.append(cp.sum_entries(Y[5+i]) == 1)
+        constraints.append(cp.sum_entries(Y[size+i]) == 1)
 
         for comb_index in range(len(comb)):
             pos = comb[comb_index]
@@ -182,12 +161,12 @@ def solve_tower(puzzle):
             # Check if there is a next largest value:
             if len(pos) != 0:
                 # Create the constraint that the value is less than the next largest value
-                constraints.append(nums * X[i][-1] < nums * X[i][-1*pos[0]-1] + (size + 1) * (1-Y[5+i][comb_index]))
+                constraints.append(nums * X[i][-1] < nums * X[i][-1*pos[0]-1] + (size + 1) * (1-Y[size+i][comb_index]))
 
                 # Create the constraint that the current value is larger than
                 # the values between it and the next largest value
                 for j in range(1,pos[0]):
-                    constraints.append((size + 1) * (1-Y[5+i][comb_index]) + nums * X[i][-1] > nums * X[i][-1*j-1])
+                    constraints.append((size + 1) * (1-Y[size+i][comb_index]) + nums * X[i][-1] > nums * X[i][-1*j-1])
 
                 # Create the rest of the inequalities
                 for p in range(len(pos)):
@@ -197,15 +176,15 @@ def solve_tower(puzzle):
                         # Create the constraint that the current value is
                         # greater than the rest of the values left, aka max
                         #for j in range(index+1,size):
-                        #    constraints.append((size + 1) * (1-Y[5+i][comb_index]) + nums * X[i][-1*index-1] > nums * X[i][-1*j-1])
-                        constraints.append((size + 1) * (1-Y[5+i][comb_index]) + nums * X[i][-1*index-1] >= size)
+                        #    constraints.append((size + 1) * (1-Y[size+i][comb_index]) + nums * X[i][-1*index-1] > nums * X[i][-1*j-1])
+                        constraints.append((size + 1) * (1-Y[size+i][comb_index]) + nums * X[i][-1*index-1] >= size)
                     else:
                         # Create the constraint that the current value is less than the next largest value
-                        constraints.append(nums * X[i][-1*index-1] < (size + 1) * (1-Y[5+i][comb_index]) + nums * X[i][-1*pos[p+1]-1])
+                        constraints.append(nums * X[i][-1*index-1] < (size + 1) * (1-Y[size+i][comb_index]) + nums * X[i][-1*pos[p+1]-1])
                         # Create the constraint that the current value is larger than
                         # the values between it and the next largest value
                         for j in range(index+1,pos[p+1]):
-                            constraints.append((size + 1) * (1-Y[5+i][comb_index]) + nums * X[i][-1*index-1] > nums * X[i][-1*j-1])
+                            constraints.append((size + 1) * (1-Y[size+i][comb_index]) + nums * X[i][-1*index-1] > nums * X[i][-1*j-1])
             else:
                 # If there are no next larger numbers, first right most number is max
                 constraints.append(X[i][-1][size-1] == 1)
@@ -219,10 +198,10 @@ def solve_tower(puzzle):
         Y.append(cp.Variable(len(comb)))
         # Create the between 0 and 1 constraint
         for k in range(len(comb)):
-            constraints.append(Y[10+j][k] <= 1)
-            constraints.append(Y[10+j][k] >= 0)
+            constraints.append(Y[size*2+j][k] <= 1)
+            constraints.append(Y[size*2+j][k] >= 0)
         # Create the only one on constraint
-        constraints.append(cp.sum_entries(Y[10+j]) == 1)
+        constraints.append(cp.sum_entries(Y[size*2+j]) == 1)
 
         for comb_index in range(len(comb)):
             pos = comb[comb_index]
@@ -230,12 +209,12 @@ def solve_tower(puzzle):
             # Check if there is a next largest value:
             if len(pos) != 0:
                 # Create the constraint that the value is less than the next largest value
-                constraints.append(nums * X[-1][j] < nums * X[-1*pos[0]-1][j] + (size + 1) * (1-Y[10+j][comb_index]))
+                constraints.append(nums * X[-1][j] < nums * X[-1*pos[0]-1][j] + (size + 1) * (1-Y[size*2+j][comb_index]))
 
                 # Create the constraint that the current value is larger than
                 # the values between it and the next largest value
                 for i in range(1,pos[0]):
-                    constraints.append((size + 1) * (1-Y[10+j][comb_index]) + nums * X[-1][j] > nums * X[-1*i-1][j])
+                    constraints.append((size + 1) * (1-Y[size*2+j][comb_index]) + nums * X[-1][j] > nums * X[-1*i-1][j])
 
                 # Create the rest of the inequalities
                 for p in range(len(pos)):
@@ -245,19 +224,19 @@ def solve_tower(puzzle):
                         # Create the constraint that the current value is
                         # greater than the rest of the values left, aka max
                         #for i in range(index+1,size):
-                        #    constraints.append((size + 1) * (1-Y[10+j][comb_index]) + nums * X[-1*index-1][j] > nums * X[-1*i-1][j])
-                        constraints.append((size + 1) * (1-Y[10+j][comb_index]) + nums * X[-1*index-1][j] >= size)
+                        #    constraints.append((size + 1) * (1-Y[size*2+j][comb_index]) + nums * X[-1*index-1][j] > nums * X[-1*i-1][j])
+                        constraints.append((size + 1) * (1-Y[size*2+j][comb_index]) + nums * X[-1*index-1][j] >= size)
                     else:
                         # Create the constraint that the current value is less than the next largest value
-                        constraints.append(nums * X[-1*index-1][j] < (size + 1) * (1-Y[10+j][comb_index]) + nums * X[-1*pos[p+1]-1][j])
+                        constraints.append(nums * X[-1*index-1][j] < (size + 1) * (1-Y[size*2+j][comb_index]) + nums * X[-1*pos[p+1]-1][j])
                         # Create the constraint that the current value is larger than
                         # the values between it and the next largest value
                         for i in range(index+1,pos[p+1]):
-                            constraints.append((size + 1) * (1-Y[10+j][comb_index]) + nums * X[-1*index-1][j] > nums * X[-1*i-1][j])
+                            constraints.append((size + 1) * (1-Y[size*2+j][comb_index]) + nums * X[-1*index-1][j] > nums * X[-1*i-1][j])
             else:
                 # If there are no next larger numbers, first right most number is max
                 #for i in range(1,size):
-                #    constraints.append((size + 1) * (1-Y[10+j][comb_index]) + nums * X[-1][j] > nums * X[-1*i-1][j])
+                #    constraints.append((size + 1) * (1-Y[size*2+j][comb_index]) + nums * X[-1][j] > nums * X[-1*i-1][j])
                 constraints.append(X[-1][j][size-1] == 1)
 
     # Create the left col constraints
@@ -269,10 +248,10 @@ def solve_tower(puzzle):
         Y.append(cp.Variable(len(comb)))
         # Create the between 0 and 1 constraint
         for k in range(len(comb)):
-            constraints.append(Y[15+i][k] <= 1)
-            constraints.append(Y[15+i][k] >= 0)
+            constraints.append(Y[size*3+i][k] <= 1)
+            constraints.append(Y[size*3+i][k] >= 0)
         # Create the only one on constraint
-        constraints.append(cp.sum_entries(Y[15+i]) == 1)
+        constraints.append(cp.sum_entries(Y[size*3+i]) == 1)
 
         for comb_index in range(len(comb)):
             pos = comb[comb_index]
@@ -280,12 +259,12 @@ def solve_tower(puzzle):
             # Check if there is a next largest value:
             if len(pos) != 0:
                 # Create the constraint that the value is less than the next largest value
-                constraints.append(nums * X[i][0] < nums * X[i][pos[0]] + (size + 1) * (1-Y[15+i][comb_index]))
+                constraints.append(nums * X[i][0] < nums * X[i][pos[0]] + (size + 1) * (1-Y[size*3+i][comb_index]))
 
                 # Create the constraint that the current value is larger than
                 # the values between it and the next largest value
                 for j in range(1,pos[0]):
-                    constraints.append((size + 1) * (1-Y[15+i][comb_index]) + nums * X[i][0] > nums * X[i][j])
+                    constraints.append((size + 1) * (1-Y[size*3+i][comb_index]) + nums * X[i][0] > nums * X[i][j])
 
                 # Create the rest of the inequalities
                 for p in range(len(pos)):
@@ -295,19 +274,19 @@ def solve_tower(puzzle):
                         # Create the constraint that the current value is
                         # greater than the rest of the values, aka max
                         #for j in range(index+1,size):
-                        #    constraints.append((size + 1) * (1-Y[15+i][comb_index]) + nums * X[i][index] > nums * X[i][j])
-                        constraints.append((size + 1) * (1-Y[15+i][comb_index]) + nums * X[i][index] >= size)
+                        #    constraints.append((size + 1) * (1-Y[size*3+i][comb_index]) + nums * X[i][index] > nums * X[i][j])
+                        constraints.append((size + 1) * (1-Y[size*3+i][comb_index]) + nums * X[i][index] >= size)
                     else:
                         # Create the constraint that the current value is less than the next largest value
-                        constraints.append(nums * X[i][index] < (size + 1) * (1-Y[15+i][comb_index]) + nums * X[i][pos[p+1]])
+                        constraints.append(nums * X[i][index] < (size + 1) * (1-Y[size*3+i][comb_index]) + nums * X[i][pos[p+1]])
                         # Create the constraint that the current value is larger than
                         # the values between it and the next largest value
                         for j in range(index+1,pos[p+1]):
-                            constraints.append((size + 1) * (1-Y[15+i][comb_index]) + nums * X[i][index] > nums * X[i][j])
+                            constraints.append((size + 1) * (1-Y[size*3+i][comb_index]) + nums * X[i][index] > nums * X[i][j])
             else:
                 # If there are no next larger numbers, first number is max
                 #for j in range(1,size):
-                #    constraints.append((size + 1) * (1-Y[15+i][comb_index]) + nums * X[i][0] > nums * X[i][j])
+                #    constraints.append((size + 1) * (1-Y[size*3+i][comb_index]) + nums * X[i][0] > nums * X[i][j])
                 constraints.append(X[i][0][size-1] == 1)
 
     prob = cp.Problem(obj,constraints)
@@ -353,6 +332,7 @@ def solve_tower(puzzle):
     iters = 0
     while(len(frontier) > 0):
         iters += 1
+        print(iters)
         # Get the lowest cost solution
         item = heapq.heappop(frontier)
 
@@ -377,7 +357,8 @@ def solve_tower(puzzle):
             closestY = (np.abs(item[4]-.5))
             x_constraint = False
             closest = closestY
-            if(closestX.min() < closestY.min()):
+            #if(closestX.min() < closestY.min()):
+            if(y_done):
                 x_constraint = True
                 closest = closestX
             closest_index = np.where(closest == closest.min())
@@ -444,14 +425,15 @@ def solve_tower(puzzle):
                                 row.append(np.nonzero(x_star[i][j])[0][0] + 1)
                             else:
                                 row.append(0)
+                        print(row)
                         output.append(row)
+                    print("")
                     x_solution = np.array(output)
 
                     x_done = np.all(np.logical_or(x_star == 0, x_star == 1))
                     valid_x = False
                     if(x_done):
-                        valid_x = validate_solution(x_solution,puzzle)
-
+                        valid_x = puzzle_gen.validate_solution(x_solution,puzzle)
 
                     if not (x_done and not valid_x):
                         if(x_constraint):
