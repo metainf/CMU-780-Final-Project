@@ -48,12 +48,15 @@ def validate_solution(grid, visibility):
     # grid is the numpy array
     # Visibility is a python tuple of Top, Right, Bottom, Left constraints
 
+    # First check that the grid is valid, or else there's no reason to continue.
+    if not validate_grid(grid):
+        return False
+
     grid_size = len(grid)
     top_visibility = visibility[0]
     right_visibility = visibility[1]
     bottom_visibility = visibility[2]
     left_visibility = visibility[3]
-
 
     for i in range(grid_size):
         top_skyline = grid[:, i]
@@ -308,39 +311,41 @@ def get_arrays_from_boards(boards, vis_counts):
     return np.vstack(tuple(rows)), np.vstack(tuple(counts))
 
 
-for i in range(1, 6):
-    start = time.time()
-    boards = generate_boards(i)
-    end = time.time()
+if __name__ == "__main__":
+    for i in range(1, 6):
+        start = time.time()
+        boards = generate_boards(i)
+        end = time.time()
 
-    # First, sort the boards by their constraints
-    vis_groups = get_vis_groups_from_boards(boards)
-    vis_counts = get_vis_counts_from_vis_groups(vis_groups)
+        # First, sort the boards by their constraints
+        vis_groups = get_vis_groups_from_boards(boards)
+        vis_counts = get_vis_counts_from_vis_groups(vis_groups)
 
-    # Next, generate some arrays for data visualization later
-    vis_array, vis_counts_array = get_arrays_from_vis_counts(vis_counts)
-    boards_array, boards_counts_array = get_arrays_from_boards(boards, vis_counts)
-    np.savez("%d_square_board_data.npz" % i,
-             vis_array=vis_array,
-             vis_counts_array=vis_counts_array,
-             boards_array=boards_array,
-             boards_counts_array=boards_counts_array,
-            )
+        # Next, generate some arrays for data visualization later
+        vis_array, vis_counts_array = get_arrays_from_vis_counts(vis_counts)
+        boards_array, boards_counts_array = get_arrays_from_boards(boards,
+                                                                   vis_counts)
+        np.savez("%d_square_board_data.npz" % i,
+                vis_array=vis_array,
+                vis_counts_array=vis_counts_array,
+                boards_array=boards_array,
+                boards_counts_array=boards_counts_array,
+                )
 
-    # Determine some statistics:
-    unique_constraints = len(vis_groups)
+        # Determine some statistics:
+        unique_constraints = len(vis_groups)
 
-    possible_puzzles = 0
-    for key in vis_groups:
-        possible_puzzles += len(vis_groups[key])
+        possible_puzzles = 0
+        for key in vis_groups:
+            possible_puzzles += len(vis_groups[key])
 
-    solution_counts = dict()
-    for key in vis_groups:
-        solutions = len(vis_groups[key])
-        solution_counts[solutions] = solution_counts.get(solutions, 0) + 1
+        solution_counts = dict()
+        for key in vis_groups:
+            solutions = len(vis_groups[key])
+            solution_counts[solutions] = solution_counts.get(solutions, 0) + 1
 
-    print("\tUnique Constraints:", unique_constraints)
-    print("\tPossible Puzzles:  ", possible_puzzles)
-    print("\tSolution Counts:   ", solution_counts)
+        print("\tUnique Constraints:", unique_constraints)
+        print("\tPossible Puzzles:  ", possible_puzzles)
+        print("\tSolution Counts:   ", solution_counts)
 
-    print("Took %f seconds to generate %d size board" % (end - start, i))
+        print("Took %f seconds to generate %d size board" % (end - start, i))
