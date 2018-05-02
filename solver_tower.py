@@ -1,6 +1,7 @@
 import numpy as np
 import cvxpy as cp
 from itertools import combinations
+from itertools import permutations
 import heapq
 from scipy.special import comb as nCr
 import time
@@ -12,16 +13,17 @@ def main():
     #puzzle = [[4,1,4,2,3],[3,2,1,3,3],[2,2,1,2,3],[2,2,2,1,3]]
     #puzzle = [[2,2,2,1,3],[2,2,3,3,1],[2,2,3,3,1],[2,2,2,1,3]]
     #puzzle = [[1,2,4,3],[3,2,1,2],[2,2,1,2],[1,2,3,2]]
-    puzzle = get_random_puzzle(5)
+    vis_dict = get_vis_dict(6)
+    for key, value in vis_dict.items():
+        print(key," ",len(value))
+    puzzle = [[1,2,4,2,3,2],[4,4,1,2,2,3],[4,4,1,2,2,3],[1,2,3,3,4,2]]
     start_time = time.clock()
+    #for i in range(5):
+    #puzzle = get_random_puzzle(5)
     output = solve_tower(puzzle)
-    end_time = time.clock()
-    for line in output[0]:
-        print(line)
-    print(output[1])
-    print(output[2])
-    print(end_time - start_time, "seconds")
     print("Solved:",puzzle_gen.validate_solution(np.array(output[0]),puzzle))
+    end_time = time.clock()
+    print((end_time - start_time), "seconds")
 
 def get_random_puzzle(size):
     filename = "%d_square_board_data.npz" % size
@@ -39,6 +41,21 @@ def get_random_puzzle(size):
 
     print(board)
     return puzzle
+
+def get_vis_dict(size):
+    output = dict()
+    rows = list(permutations([i for i in range(1,size+1)],size))
+    for row in rows:
+        l_num = puzzle_gen.get_visibility_number(row)
+        r_num = puzzle_gen.get_visibility_number(row[::-1])
+        val = output.get((l_num,r_num))
+        #output[(l_num,r_num)] =
+        if (val is not None):
+            val.append(row)
+            output[(l_num,r_num)] = val
+        else:
+            output[(l_num,r_num)] = [row]
+    return(output)
 
 def solve_tower(puzzle):
     # Puzzles are in the format:
@@ -332,7 +349,7 @@ def solve_tower(puzzle):
     iters = 0
     while(len(frontier) > 0):
         iters += 1
-        print(iters)
+        #print(iters)
         # Get the lowest cost solution
         item = heapq.heappop(frontier)
 
@@ -406,16 +423,11 @@ def solve_tower(puzzle):
                     y_star[np.logical_and(y_star >= -.005, y_star <= .005)] = 0
                     y_star[np.logical_and(y_star >= 1-.005, y_star <= 1+.005)] = 1
 
-                    # Count the number of ones in x and y
+                    # Count the number of ones and zeros in x and y
                     total_count = np.count_nonzero(x_star == 1)
                     total_count += np.count_nonzero(y_star == 1)
-
-                    # Count the number of 1 constraints in x and y
-                    for con in item[3]:
-                        total_count += con[3]
-                    for con in item[5]:
-                        total_count += con[2]
-                    total_count += c
+                    total_count += np.count_nonzero(x_star == 0)
+                    total_count += np.count_nonzero(y_star == 0)
 
                     output = []
                     for i in range(size):
@@ -427,25 +439,29 @@ def solve_tower(puzzle):
                                 row.append(0)
                         print(row)
                         output.append(row)
-                    print("")
                     x_solution = np.array(output)
 
                     x_done = np.all(np.logical_or(x_star == 0, x_star == 1))
+                    y_done = np.all(np.logical_or(y_star == 0, y_star == 1))
                     valid_x = False
+                    #print(y_done)
+                    print(iters)
+                    print("")
+
                     if(x_done):
                         valid_x = puzzle_gen.validate_solution(x_solution,puzzle)
 
                     if not (x_done and not valid_x):
                         if(x_constraint):
-                            heapq.heappush(frontier,(random.random()-total_count,item[1]+1,x_star,item[3] + [(new_i+1, new_j+1, new_k+1, c)],y_star,item[5]))
+                            heapq.heappush(frontier,(0-y_done,random.random()-total_count-c*50,x_star,item[3] + [(new_i+1, new_j+1, new_k+1, c)],y_star,item[5]))
                         else:
-                            heapq.heappush(frontier,(random.random()-total_count,item[1]+1,x_star,item[3],y_star,item[5] + [(new_i,new_j,c)]))
+                            heapq.heappush(frontier,(0-y_done,random.random()-total_count-c*50,x_star,item[3],y_star,item[5] + [(new_i,new_j,c)]))
                 else:
                     # Push the current solution onto the heapquene
                     if(x_constraint):
-                        heapq.heappush(frontier,(random.random()-c,item[1]+1,None,item[3] + [(new_i+1, new_j+1, new_k+1, c)],None,item[5]))
+                        heapq.heappush(frontier,(0-y_done,random.random()-c,None,item[3] + [(new_i+1, new_j+1, new_k+1, c)],None,item[5]))
                     else:
-                        heapq.heappush(frontier,(random.random()-c,item[1]+1,None,item[3],None,item[5] + [(new_i,new_j,c)]))
+                        heapq.heappush(frontier,(0-y_done,random.random()-c,None,item[3],None,item[5] + [(new_i,new_j,c)]))
 
 
 if __name__ == '__main__':
